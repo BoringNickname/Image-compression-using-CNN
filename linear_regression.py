@@ -4,19 +4,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import chi2
 import random
-import torchvision
-from sklearn.datasets import load_breast_cancer
-from sklearn.preprocessing import StandardScaler
 
 
 def gen_data_with_labels(shape, add_signal = False, SNR = 1):
 
     #generate noise
-    noise_layers = []
     df = 2
-    for i in range(shape[0]):
-        noise_layers.append(np.array(chi2.rvs(df, size = shape)))
-    noise = np.stack(noise_layers)
+    noise = np.array(chi2.rvs(df, size = shape))
     normalized_noise = noise/np.amax(noise)
 
     #generate signal
@@ -33,28 +27,29 @@ def gen_data_with_labels(shape, add_signal = False, SNR = 1):
       label = 0
     return noisy_signal, label
 
-#show the noise signal and the signal
-x,y = gen_data_with_labels((20,20), add_signal = add_signal, SNR=3)
+#show the noise signal and the label
+x,y = gen_data_with_labels((20,20), add_signal = True, SNR=5)
 fig, ax = plt.subplots(1,1, figsize = (10,5))
 ax.imshow(x)
 print(y)
 
-# %%
+#%%
+
 #generate 1000 pieces of data
-x_data,y_data = [],[]
+x_data, y_data = [],[]
 shape= (20,20)
-for i in range(1000):
+num_samples = 1000
+for i in range(num_samples):
     add_signal = random.choice([True, False])
     input_img, label = gen_data_with_labels(shape, add_signal = add_signal, SNR=4)
     x_data.append(input_img)
     y_data.append(label)
 
 #SCALING THE DATA
-x_data = np.array(x_data)
-y_data = np.array(y_data)
+x_data, y_data = np.array(x_data), np.array(y_data)
 print(f'shape of x: {x_data.shape}, \nshape of y: {y_data.shape}')
-#scaling the images
 # %%
+
 #CREATING THE DATALOADER
 from torch.utils.data import Dataset, DataLoader
 class DatasetClass(Dataset):
@@ -68,9 +63,11 @@ class DatasetClass(Dataset):
   def __len__(self):
     return self.length
 
+batch_size = 10
 trainset = DatasetClass(x_data,y_data)
-trainloader = DataLoader(trainset,batch_size= 10,shuffle = True)
+trainloader = DataLoader(trainset,batch_size = batch_size,shuffle = True)
 # %%
+
 #DEFINE THE NEURAL NETWORK
 from torch import nn
 from torch.nn import functional as F 
@@ -78,18 +75,17 @@ from torch.nn import functional as F
 class Net(nn.Module):
     def __init__(self, input_shape):
         super(Net, self).__init__()
-        print('input shape', input_shape)
-        self.fc1 = nn.Linear(input_shape, 64)
-        self.fc2 = nn.Linear(64,1)
-        # self.fc3 = nn.Linear(64,1)
+        self.fc1 = nn.Linear(input_shape**2, 50)
+        self.fc2 = nn.Linear(50,1)
 
     def forward(self,x):
         # print('1',x.shape)
-        x = torch.flatten(x)
+        x = x.view(batch_size,-1)
+        # print('flattened x shape', x.shape)
         x = F.relu(self.fc1(x))
         # print('2',x.shape)
         x = F.sigmoid(self.fc2(x))
-        # # print('3',x.shape)
+        # print('3',x.shape)
         # x = torch.sigmoid(self.fc3(x))
         # print('4',x.shape)
         return x
@@ -103,6 +99,7 @@ class ConvNet(nn.Module):
 
         self.fc3 = nn.Linear(3*3*3, 16)
         self.fc4 = nn.Linear(16,1)
+        
     def forward(self,x):
         # print('1',x.shape)
         x = F.relu(self.fc1(x))
@@ -122,10 +119,12 @@ class ConvNet(nn.Module):
         return x
 # %%
 #DEFINE MODEL PARAMETERS
-lr = 0.001
+lr = 0.005
 epochs = 1000
+print('x_data shape', x_data.shape)
 
-model = Net(input_shape = x_data.shape[1])
+model = ConvNet(input_shape = x_data.shape[1])
+# model = Net(input_shape = x_data.shape[1], batch_size=batch_size)
 optimizer = torch.optim.SGD(model.parameters(), lr = lr)
 loss_fn = nn.BCELoss()
 
@@ -155,35 +154,38 @@ for i in range(epochs):
     losses.append(loss)
     accuracy.append(acc)
     print(f'epoch:{i}, loss:{loss}, accuracy: {acc}')
+    
 # %%
 #LET'S TEST THE MODEL
-test_x, test_y = [],[]
-shape= (20,20)
-for i in range(100):
-    add_signal = random.choice([True, False])
-    input_img, label = gen_data_with_labels(shape, add_signal = add_signal, SNR=3)
-    test_x.append(input_img)
-    test_y.append(label)
+# test_x, test_y = [],[]
+# shape= (20,20)
+# for i in range(100):
+#     add_signal = random.choice([True, False])
+#     input_img, label = gen_data_with_labels(shape, add_signal = add_signal, SNR=3)
+#     test_x.append(input_img)
+#     test_y.append(label)
 
 #SCALING THE DATA
-test_x = np.array([np.ravel(sc.fit_transform(x)) for x in test_x])
-test_y = np.array(test_y)
-print(f'shape of x: {test_x.shape}, \nshape of y: {test_y.shape}')
+# test_x = np.array([np.ravel(sc.fit_transform(x)) for x in test_x])
+# test_y = np.array(test_y)
+# print(f'shape of x: {test_x.shape}, \nshape of y: {test_y.shape}')
 
-testset = DatasetClass(test_x,test_y)
-testloader = DataLoader(testset,batch_size= 1,shuffle = True)
+# testset = DatasetClass(test_x,test_y)
+# testloader = DataLoader(testset,batch_size= 1,shuffle = True)
+
+
 # %%
-with torch.no_grad():
-  correct = 0
+# with torch.no_grad():
+#   correct = 0
 
-  for x_test, y_test in testloader:
-    plt.imshow(x_test.reshape(20,20))
-    y_val = model(x_test)
-    # print(y_val, 'Y_VAL')
-    # predicted = torch.max(y_val, 1)[1]
-    predicted = model(torch.tensor(x_test, dtype=torch.float32))
-    correct += (predicted==y_test)
-    print(f'predicted:{predicted}, \ny_test:{y_test}, \ny_val: {y_val}')
-    break
+#   for x_test, y_test in testloader:
+#     plt.imshow(x_test.reshape(20,20))
+#     y_val = model(x_test)
+#     # print(y_val, 'Y_VAL')
+#     # predicted = torch.max(y_val, 1)[1]
+#     predicted = model(torch.tensor(x_test, dtype=torch.float32))
+#     correct += (predicted==y_test)
+#     print(f'predicted:{predicted}, \ny_test:{y_test}, \ny_val: {y_val}')
+#     break
 
 # %%

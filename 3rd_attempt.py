@@ -96,7 +96,7 @@ def gen_data_with_varied_strengths(shape=(20,20), SNR = 1, n_samples=1e3):
         row = np.random.randint(0, shape[-1])
         signal[row] = signal_strength
 
-        signal_plus_noise= (signal+normalized_noise)
+        signal_plus_noise = (signal+normalized_noise)
         noisy_signal = signal_plus_noise/np.amax(signal_plus_noise)
         ref_img = signal/np.amax(signal)
  
@@ -107,22 +107,21 @@ def gen_data_with_varied_strengths(shape=(20,20), SNR = 1, n_samples=1e3):
 def gen_data_with_varied_strengths_and_mixed_signals(shape=(20,20), SNR = 1, n_samples=1e3):
     x_data, y_data  = [], []
     for i in range(n_samples):
+                
         #generate noise
-        add_signal = random.choice([True, False])
-        singal_strength = np.random.rand()
-
         noise = np.array(chi2.rvs(df = 2, size = shape))
         normalized_noise = noise/np.amax(noise)
-
+                    
         #generate signal
+        add_signal = random.choice([True, False]) #choose whether an example will have signal in it
+        signal_strength = np.random.rand()
         signal = np.zeros(shape)
-        row = np.random.randint(0, shape[-1])
-        signal[row] = singal_strength
-
+        row = np.random.randint(0, shape[-1]) #pick a random row
+        signal[row] = signal_strength
+        
         #combine
         if add_signal:
-            signal_plus_noise= (signal+normalized_noise)
-            noisy_signal = signal_plus_noise
+            noisy_signal = (signal+normalized_noise)
             ref_img = signal
         else:
             noisy_signal = normalized_noise
@@ -133,7 +132,7 @@ def gen_data_with_varied_strengths_and_mixed_signals(shape=(20,20), SNR = 1, n_s
     return x_data, y_data
 #SHOW A NICE SUBPLOT GRID OF THE GENERATED DATA
 if True:
-  x_data, y_data = gen_data_with_varied_strengths_and_mixed_signals((20,20), n_samples=10, SNR=2)
+  x_data, y_data = gen_data_with_varied_strengths_and_mixed_signals((20,20), n_samples=9, SNR=2)
   a = 0
   fig, ax = plt.subplots(3,3, figsize=(9,9), sharex=True, sharey=True)
   for i in range(3):
@@ -148,7 +147,6 @@ if True:
           ax[i,j].imshow(y_data[a])
           a+=1
 
-print([np.sum(y) for y in y_data])
 # %%
 #CREATING A CUSTOM TRAINLOADER
 class DatasetClass(Dataset):
@@ -255,19 +253,19 @@ class SemanticModel(nn.Module):
 # %%
 #SOME GLOBAL VARIABLES
 lr = 0.004
-epochs = 30
-batch_size = 10
+epochs = 300
+batch_size = 100
 shape = (30,30)
 
 #CREATING THE DATA
 # data = DatasetClass(*gen_data_with_labels(shape, SNR=2, n_samples = 1000))
-data = DatasetClass(*gen_data_with_varied_strengths_and_mixed_signals(shape, SNR=2, n_samples = 1000)) #DATA IS CHANGED!!
+data = DatasetClass(*gen_data_with_varied_strengths_and_mixed_signals(shape, SNR=2, n_samples = 10000)) #DATA IS CHANGED!!
 trainloader, testloader = train_test_split_dataloaders(data, 0.8)
 
 # %%
 accuracy, losses = [],[]
-# model = ComplexConvNet()
-model = SemanticModel()
+model = ConvNet()
+# model = SemanticModel()
 print(model)
 #OPTIMIZER AND LOSS FUNCTION
 optimizer = torch.optim.Adam(model.parameters(), lr = lr)
